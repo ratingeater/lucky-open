@@ -155,11 +155,12 @@ function isProblemIntent(qLower: string) {
 
 function isShortEntityQuery(tokens: string[]) {
   if (tokens.length === 0) return false;
-  if (tokens.length > 3) return false;
+  // Only 1-2 token queries should be treated as company/entity
+  if (tokens.length > 2) return false;
   const joined = tokens.join(" ");
   if (/[\/#:@(){}\[\]]/.test(joined)) return false;
 
-  const bad = ["docs", "documentation", "api", "how", "fix", "error", "issue", "repo", "github", "文档", "报错", "仓库"];
+  const bad = ["docs", "documentation", "api", "how", "fix", "error", "issue", "repo", "github", "文档", "报错", "仓库", "forum", "tutorial", "example", "guide"];
   if (tokens.some((t) => bad.includes(t))) return false;
 
   return true;
@@ -312,9 +313,16 @@ export function pickBestUrl(intent: Intent, query: string, results: ExaResult[])
       if (host.includes("dev.to")) score -= 4;
       if (host.includes("blog.")) score -= 3;
       
+      // Heavily penalize low-quality or random business sites
+      if (host.endsWith(".business.site")) score -= 15;
+      if (host.includes("uzone.id")) score -= 10;
+      if (host.includes("blogspot")) score -= 8;
+      if (host.includes("wordpress.com")) score -= 5;
+      
       // Prefer official/company domains
       if (host.endsWith(".microsoft.com") || host.endsWith(".google.com") || host.endsWith(".apple.com")) score += 5;
       if (host.endsWith(".azure.com") || host.endsWith(".aws.amazon.com")) score += 4;
+      if (host.endsWith(".org") || host.endsWith(".edu")) score += 3;
       
       // Pricing pages are often what users want
       if (path.includes("/pricing")) score += 6;
