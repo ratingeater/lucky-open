@@ -294,34 +294,46 @@ export function pickBestUrl(intent: Intent, query: string, results: ExaResult[])
 
       // 使用 Exa 返回的 score 作为基础分（如果有的话）
       if (r.score && r.score > 0) {
-        score += r.score * 5;
+        score += r.score * 3;
       }
 
-      // 通用落点偏好：短路径、非登录、非跟踪参数
-      if (path === "/" || path === "") score += 8;
-      if (path.length <= 18) score += 3;
+      // Penalize login/auth pages
       if (/\/(login|signin|sign-in|auth)\b/.test(path)) score -= 12;
 
       // token 覆盖：域名命中更像"官方"
       for (const t of qTokens) {
-        if (host.includes(t)) score += 2.2;
-        if (title.includes(t)) score += 0.6;
+        if (host.includes(t)) score += 4;
+        if (title.includes(t)) score += 2;
+        if (path.includes(t)) score += 3;
       }
 
       // "二手内容"轻惩罚（不是黑名单，只是更不像官方落点）
       if (host.includes("medium.com")) score -= 5;
       if (host.includes("dev.to")) score -= 4;
+      if (host.includes("blog.")) score -= 3;
+      
+      // Prefer official/company domains
+      if (host.endsWith(".microsoft.com") || host.endsWith(".google.com") || host.endsWith(".apple.com")) score += 5;
+      if (host.endsWith(".azure.com") || host.endsWith(".aws.amazon.com")) score += 4;
+      
+      // Pricing pages are often what users want
+      if (path.includes("/pricing")) score += 6;
 
       if (intent === "repo") {
         // GitHub / GitLab：强偏好"仓库根路径"
         if (host === "github.com") {
           const seg = path.split("/").filter(Boolean);
-          if (seg.length === 2) score += 18; // /owner/repo
-          if (seg.length > 2) score -= (seg.length - 2) * 1.3;
+          if (seg.length === 2) score += 12; // /owner/repo
+          if (seg.length > 2) score -= (seg.length - 2) * 1.5;
           if (/\/(issues|pull|pulls|actions|wiki|releases|blob|tree|compare)\b/.test(path)) score -= 6;
+          
+          // Prefer well-known organizations
+          const owner = seg[0]?.toLowerCase() || "";
+          const wellKnownOrgs = ["facebookresearch", "google", "microsoft", "openai", "meta", "facebook", "apple", "amazon", "nvidia", "anthropic", "huggingface"];
+          if (wellKnownOrgs.includes(owner)) score += 10;
         } else if (host === "gitlab.com") {
           const seg = path.split("/").filter(Boolean);
-          if (seg.length === 2) score += 16;
+          if (seg.length === 2) score += 10;
         }
       }
 
