@@ -1,4 +1,6 @@
 // lib/exa.ts
+import "server-only";
+
 export type ExaSearchType = "neural" | "keyword" | "auto";
 export type ExaCategory =
   | "company"
