@@ -38,18 +38,57 @@ export type ExaSearchResponse = {
   results: ExaResult[];
 };
 
-const EXA_SEARCH_ENDPOINT = "https://api.exa.ai/search";
+type ExaAuthMode = "x-api-key" | "bearer" | "both";
+
+function env(name: string): string | undefined {
+  const v = process.env[name];
+  if (!v) return undefined;
+  const trimmed = v.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function getExaAuthMode(): ExaAuthMode {
+  const v = (env("EXA_AUTH_MODE") || "x-api-key").toLowerCase();
+  if (v === "x-api-key" || v === "bearer" || v === "both") return v;
+  throw new Error(`Invalid EXA_AUTH_MODE: ${v}`);
+}
+
+function getExaSearchEndpoint(): string {
+  const explicit = env("EXA_SEARCH_ENDPOINT");
+  if (explicit) {
+    const u = new URL(explicit);
+    if (u.protocol !== "https:" && u.protocol !== "http:") {
+      throw new Error("EXA_SEARCH_ENDPOINT must be http(s)");
+    }
+    return u.toString();
+  }
+
+  const base = env("EXA_API_BASE_URL") || "https://api.exa.ai";
+  const u = new URL(base);
+  if (u.protocol !== "https:" && u.protocol !== "http:") {
+    throw new Error("EXA_API_BASE_URL must be http(s)");
+  }
+  return new URL("/search", u).toString();
+}
+
+function buildExaAuthHeaders(apiKey: string): Record<string, string> {
+  const mode = getExaAuthMode();
+  if (mode === "x-api-key") return { "x-api-key": apiKey };
+  if (mode === "bearer") return { authorization: `Bearer ${apiKey}` };
+  return { "x-api-key": apiKey, authorization: `Bearer ${apiKey}` };
+}
 
 export async function exaSearch(body: ExaSearchBody, signal?: AbortSignal): Promise<ExaSearchResponse> {
-  const apiKey = process.env.EXA_API_KEY;
+  const apiKey = env("EXA_API_KEY");
   if (!apiKey) throw new Error("Missing EXA_API_KEY");
 
-  const res = await fetch(EXA_SEARCH_ENDPOINT, {
+  const endpoint = getExaSearchEndpoint();
+  const res = await fetch(endpoint, {
     method: "POST",
     headers: {
       accept: "application/json",
       "content-type": "application/json",
-      "x-api-key": apiKey
+      ...buildExaAuthHeaders(apiKey)
     },
     body: JSON.stringify({
       numResults: 10,

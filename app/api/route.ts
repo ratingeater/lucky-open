@@ -38,7 +38,10 @@ export async function GET(req: Request) {
 
   // Exa 搜索
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 3000);
+  const timeoutMsRaw = process.env.EXA_TIMEOUT_MS;
+  const timeoutMs = timeoutMsRaw ? Number(timeoutMsRaw) : 3000;
+  const effectiveTimeoutMs = Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 3000;
+  const timeout = setTimeout(() => controller.abort(), effectiveTimeoutMs);
 
   try {
     const res = await exaSearch(plan.searchBody, controller.signal);
@@ -59,9 +62,10 @@ export async function GET(req: Request) {
     }
 
     return NextResponse.redirect(googleLuckyUrl(q), { status: 302 });
-  } catch {
+  } catch (err) {
     if (debug) {
-      return NextResponse.json({ q, error: "exa_failed", fallback: googleLuckyUrl(q) });
+      const message = err instanceof Error ? err.message : String(err);
+      return NextResponse.json({ q, error: "exa_failed", message, fallback: googleLuckyUrl(q) });
     }
     return NextResponse.redirect(googleLuckyUrl(q), { status: 302 });
   } finally {
